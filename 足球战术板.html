@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>足球战术板</title>
+<style>
+  :root{
+    --green:#2f7d46; --green2:#3f9a5a; --line:#ffffffcc;
+    --bg:#0f1d17; --card:#182b22; --card2:#1f3a2c; --txt:#eaf4ec; --sub:#9fbca6;
+    --acc:#ffcf3f; --blue:#4aa3ff; --red:#ff6b5b;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    overflow-x:hidden;}
+  body{padding-bottom:76px;}
+  h1,h2,h3{margin:0;}
+  .app{max-width:720px;margin:0 auto;padding:12px;}
+
+  header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;}
+  header h1{font-size:19px;display:flex;align-items:center;gap:6px;}
+  .logo{width:26px;height:26px;border-radius:7px;background:radial-gradient(circle at 35% 35%,#fff,#c9c9c9);
+    position:relative;box-shadow:0 2px 6px #0008;}
+  .logo::after{content:"";position:absolute;inset:6px;border:2px solid #2f7d46;border-radius:50%;}
+
+  .btn{border:none;border-radius:10px;padding:9px 13px;font-size:13px;font-weight:600;
+    color:#123;background:var(--acc);cursor:pointer;transition:.15s;white-space:nowrap;}
+  .btn:active{transform:scale(.95);}
+  .btn.ghost{background:var(--card2);color:var(--txt);border:1px solid #ffffff18;}
+  .btn.blue{background:var(--blue);}
+  .btn.red{background:var(--red);}
+  .btn.sm{padding:6px 10px;font-size:12px;border-radius:8px;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+
+  .infobar{display:flex;gap:8px;margin-bottom:10px;}
+  .infobox{flex:1;background:var(--card);border:1px solid #ffffff12;border-radius:12px;padding:8px 10px;
+    display:flex;align-items:center;gap:8px;min-width:0;}
+  .infobox .ic{font-size:18px;line-height:1;}
+  .infobox .lbl{font-size:11px;color:var(--sub);}
+  .infobox .val{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .chip{padding:2px 7px;border-radius:20px;font-size:11px;background:#ffffff14;}
+
+  /* 球场：竖屏 3:4，Y 轴为球场长度方向 */
+  .pitchwrap{position:relative;background:
+      linear-gradient(180deg,var(--green) 0%,var(--green2) 50%,var(--green) 100%);
+    border-radius:14px;overflow:hidden;border:2px solid #ffffff22;box-shadow:0 6px 20px #0008;}
+  .pitch{position:relative;width:100%;aspect-ratio: 3/4;}
+  .pitch::before{content:"";position:absolute;inset:0;
+    background:repeating-linear-gradient(0deg,transparent 0,transparent 11%,#ffffff06 11%,#ffffff06 11.5%);}
+  svg.lines{position:absolute;inset:0;width:100%;height:100%;}
+  .player{position:absolute;width:52px;height:52px;margin-left:-26px;margin-top:-26px;
+    border-radius:50%;background:radial-gradient(circle at 32% 28%,#ffe27a,#d9a52b);
+    color:#2a1c00;display:flex;align-items:center;justify-content:center;
+    font-weight:800;cursor:grab;z-index:5;flex-direction:column;
+    box-shadow:0 3px 8px #0009,inset 0 0 0 2px #ffffffcc;user-select:none;touch-action:none;}
+  .player .pos{font-size:8px;font-weight:800;letter-spacing:.5px;line-height:1;opacity:.92;pointer-events:none;}
+  .player .num{font-size:15px;line-height:1;letter-spacing:-.5px;}
+  .player .pname{position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);
+    width:74px;box-sizing:border-box;text-align:center;
+    border:1px solid #ffffff44;background:#0e1c14d9;color:#fff;
+    font-size:11px;font-weight:600;padding:2px 3px;border-radius:6px;outline:none;z-index:20;}
+  .player .pname:focus{border-color:#ffe27a;background:#0e1c14ee;z-index:30;}
+  .player .pname::placeholder{color:#ffffff66;}
+  .player.dragging{cursor:grabbing;z-index:99;transform:scale(1.12);box-shadow:0 8px 18px #000c;}
+
+  /* 主力和替补使用完全相同的卡片结构 */
+  .bencharea{background:var(--card);border:1px solid #ffffff12;border-radius:12px;padding:16px;margin-top:12px;}
+  .bencharea h3{font-size:13px;color:var(--sub);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;}
+  .benchgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:22px 8px;}
+  .player.bench{position:static;margin:0;width:60px;height:60px;font-size:17px;
+    box-shadow:0 2px 5px #0008,inset 0 0 0 2px #ffffffcc;justify-self:center;}
+  .player.sub{filter:saturate(.55) brightness(.85);}
+  .player.bench .pos{font-size:9px;}
+  .player.bench .pname{bottom:calc(100% + 6px);width:74px;}
+  .benchslot{width:60px;height:60px;border-radius:50%;border:1.5px dashed #ffffff33;
+    display:flex;align-items:center;justify-content:center;font-size:22px;color:#ffffff33;justify-self:center;}
+
+  /* 移动端：替补席保持 6 列，卡片略缩小 */
+  @media (max-width:400px){
+    .benchgrid{grid-template-columns:repeat(6,1fr);gap:16px 4px;}
+    .player,.player.bench{width:46px;height:46px;margin-left:-23px;}
+    .player.bench{margin-left:0;}
+    .player.bench .pname{width:62px;font-size:10px;}
+  }
+
+  .mask{position:fixed;inset:0;background:#000c;z-index:200;display:none;align-items:flex-end;}
+  .mask.show{display:flex;}
+  .sheet{background:var(--card);width:100%;max-height:88vh;overflow:auto;border-radius:18px 18px 0 0;
+    padding:14px;animation:up .25s ease;}
+  @keyframes up{from{transform:translateY(40px);opacity:0;}to{transform:none;opacity:1;}}
+  .sheet h2{font-size:17px;margin-bottom:4px;}
+  .sheet .sub{color:var(--sub);font-size:12px;margin-bottom:14px;}
+  .field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
+  .field label{font-size:12px;color:var(--sub);}
+  .field input,.field select,.field textarea{background:var(--card2);border:1px solid #ffffff18;
+    color:var(--txt);border-radius:10px;padding:10px;font-size:14px;font-family:inherit;}
+  .field input:focus,.field select:focus{outline:2px solid var(--acc);}
+  .footbtn{display:flex;gap:8px;position:sticky;bottom:0;background:var(--card);padding-top:8px;}
+  .footbtn .btn{flex:1;text-align:center;}
+  .closex{position:absolute;top:12px;right:14px;font-size:22px;color:var(--sub);}
+
+  .plist{display:flex;flex-direction:column;gap:8px;}
+  .pitem{display:flex;align-items:center;gap:10px;background:var(--card2);border-radius:12px;padding:8px 10px;}
+  .pitem .av{width:38px;height:38px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#ffe27a,#d9a52b);
+    color:#2a1c00;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex:none;
+    box-shadow:inset 0 0 0 2px #ffffffaa;flex-direction:column;line-height:1.1;}
+  .pitem .av span{font-size:8px;font-weight:600;}
+  .pitem .info{flex:1;min-width:0;}
+  .pitem .info .n{font-weight:700;font-size:14px;}
+  .pitem .info .d{font-size:11px;color:var(--sub);}
+  .pitem .acts{display:flex;gap:5px;flex:none;}
+
+  .advicebox{background:linear-gradient(135deg,#1c3a55,#123);border:1px solid #4aa3ff44;
+    border-radius:14px;padding:14px;margin-top:10px;display:none;}
+  .advicebox.show{display:block;}
+  .advicebox h3{color:var(--blue);font-size:14px;margin-bottom:8px;}
+  .advicebox .line{background:#ffffff08;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:13px;}
+  .advicebox .lt{color:var(--acc);font-weight:700;margin-bottom:5px;font-size:13px;}
+  .advicebox ul{margin:0;padding-left:0;list-style:none;}
+  .advicebox ul li{padding-left:16px;position:relative;margin-bottom:5px;line-height:1.65;}
+  .advicebox ul li::before{content:"";position:absolute;left:4px;top:8px;width:5px;height:5px;border-radius:50%;background:var(--acc);}
+  .selfinput{width:100%;min-height:60px;background:var(--card2);border:1px solid #ffffff18;
+    color:var(--txt);border-radius:10px;padding:10px;font-size:13px;font-family:inherit;margin-top:8px;resize:vertical;}
+
+  .formgrid{display:flex;flex-wrap:wrap;gap:8px;}
+  .formopt{flex:1;min-width:70px;text-align:center;background:var(--card2);border:2px solid transparent;
+    border-radius:10px;padding:10px 6px;cursor:pointer;}
+  .formopt.active{border-color:var(--acc);}
+  .formopt .ff{font-weight:800;font-size:15px;}
+  .formopt .fd{font-size:11px;color:var(--sub);}
+
+  .hint{font-size:11px;color:var(--sub);margin-top:6px;}
+  .empty{color:var(--sub);font-size:12px;text-align:center;padding:20px;}
+  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#000d;color:#fff;
+    padding:10px 16px;border-radius:20px;font-size:13px;z-index:300;opacity:0;transition:.3s;pointer-events:none;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1><span class="logo"></span>足球战术板</h1>
+    <div class="row">
+      <button class="btn ghost sm" id="btnWeather">⛅ 天气</button>
+      <button class="btn ghost sm" id="btnCoach">🎯 教练</button>
+      <button class="btn blue sm" id="btnRoster">👤 球员资料</button>
+    </div>
+  </header>
+
+  <div class="infobar">
+    <div class="infobox"><span class="ic">⛅</span><div><div class="lbl">天气</div><div class="val" id="valWeather">晴天 22°C</div></div></div>
+    <div class="infobox"><span class="ic">🎯</span><div><div class="lbl">教练 / 阵型</div><div class="val" id="valCoach">未设置 · 4-4-2</div></div></div>
+    <div class="infobox"><span class="ic">⏱️</span><div><div class="lbl">比分</div><div class="val" id="valScore">0 : 0</div></div></div>
+  </div>
+
+  <!-- 球场（竖屏，Y 为长度方向） -->
+  <div class="pitchwrap">
+    <div class="pitch" id="pitch">
+      <svg class="lines" viewBox="0 0 100 133.33" preserveAspectRatio="none">
+        <!-- 外框 -->
+        <rect x="2" y="2" width="96" height="129.33" fill="none" stroke="var(--line)" stroke-width="0.6"/>
+        <!-- 中线：横穿球场（Y 固定，X 从 2 到 98）-->
+        <line x1="2" y1="66.66" x2="98" y2="66.66" stroke="var(--line)" stroke-width="0.6"/>
+        <!-- 中圈 -->
+        <circle cx="50" cy="66.66" r="9" fill="none" stroke="var(--line)" stroke-width="0.6"/>
+        <circle cx="50" cy="66.66" r="0.8" fill="var(--line)"/>
+        <!-- 中圈发球点 -->
+        <circle cx="50" cy="66.66" r="0.5" fill="var(--line)"/>
+        <!-- 开球区横线 -->
+        <line x1="44" y1="66.66" x2="44" y2="60" stroke="var(--line)" stroke-width="0.5"/>
+        <line x1="56" y1="66.66" x2="56" y2="60" stroke="var(--line)" stroke-width="0.5"/>
+        <line x1="44" y1="60" x2="56" y2="60" stroke="var(--line)" stroke-width="0.5"/>
+
+        <!-- 上半场禁区（防守方/球门在顶部） -->
+        <rect x="22" y="2" width="56" height="22" fill="none" stroke="var(--line)" stroke-width="0.6"/>
+        <rect x="33" y="2" width="34" height="9" fill="none" stroke="var(--line)" stroke-width="0.6"/>
+        <rect x="41" y="2" width="18" height="5" fill="none" stroke="var(--line)" stroke-width="0.6"/>
+        <rect x="47.5" y="7" width="5" height="3" fill="none" stroke="var(--line)" stroke-width="0.5"/>
+        <!-- 上半场罚球弧 -->
+        <path d="M 41 24 A 9 9 0 0 1 59 24" fill="none" stroke="var(--line)" stroke-width="0.5"/>
+
+        <!-- 下半场禁区 -->
+        <rect x="22" y="109.33" width="56" height="22" fill="none" stroke="var(--line)" stroke-width="0.6"/>
+        <rect x="33" y="122.33" width="34" height="9" fill="none" stroke="var(--line)" stroke-width="0.6"/>
+        <rect x="41" y="126.33" width="18" height="5" fill="none" stroke="var(--line)" stroke-width="0.6"/>
+        <rect x="47.5" y="123.33" width="5" height="3" fill="none" stroke="var(--line)" stroke-width="0.5"/>
+        <path d="M 41 109.33 A 9 9 0 0 0 59 109.33" fill="none" stroke="var(--line)" stroke-width="0.5"/>
+
+        <!-- 角球弧 -->
+        <path d="M 2 11 A 3 3 0 0 0 11 2" fill="none" stroke="var(--line)" stroke-width="0.5"/>
+        <path d="M 89 2 A 3 3 0 0 0 98 11" fill="none" stroke="var(--line)" stroke-width="0.5"/>
+        <path d="M 2 122.33 A 3 3 0 0 1 11 131.33" fill="none" stroke="var(--line)" stroke-width="0.5"/>
+        <path d="M 89 131.33 A 3 3 0 0 1 98 122.33" fill="none" stroke="var(--line)" stroke-width="0.5"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="hint">💡 拖动球衣排兵布阵；球衣圆圈内是号码，上方是位置简写（ST / CM / CDM / GK…），下方输入框可直接填姓名；点球员循环切换位置；身高体重等资料用右上「球员资料」管理。</div>
+
+  <div style="margin-top:12px;">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px;">
+      <h2 style="font-size:15px;">⚙️ 阵型切换</h2>
+    </div>
+    <div class="formgrid" id="formGrid"></div>
+  </div>
+
+  <div class="bencharea">
+    <h3><span>🪑 替补席（12 人）</span><span class="chip"><b id="benchCount">0</b>/12</span></h3>
+    <div class="benchgrid" id="benchGrid"></div>
+  </div>
+
+  <div style="margin-top:12px;display:flex;gap:8px;">
+    <button class="btn blue" style="flex:1" id="btnAI">🤖 AI 战术建议</button>
+    <button class="btn" style="flex:1" id="btnSelf">✍️ 自我部署</button>
+  </div>
+  <div class="advicebox" id="adviceBox">
+    <h3 id="adviceTitle">🤖 AI 战术建议</h3>
+    <div id="adviceList"></div>
+    <textarea class="selfinput" id="selfInput" placeholder="写下你的部署想法，例如：下半场落后一球，我想把阵型压上去打边路，换上速度快的边锋……"></textarea>
+    <div class="footbtn">
+      <button class="btn ghost" id="btnBackAI">🤖 查看 AI 建议</button>
+      <button class="btn blue" id="btnAskAI" style="flex:1">让 AI 分析我的部署</button>
+    </div>
+  </div>
+</div>
+
+<!-- 球员资料总览（独立入口） -->
+<div class="mask" id="maskRoster">
+  <div class="sheet" style="position:relative;">
+    <span class="closex" data-close>×</span>
+    <h2>👤 球员资料</h2>
+    <div class="sub">11 名首发 + 12 名替补。点击「编辑」填写姓名、身高、体重、惯用脚等资料。</div>
+    <div class="plist" id="rosterList"></div>
+    <div class="footbtn">
+      <button class="btn ghost" data-close style="flex:1">关闭</button>
+      <button class="btn" id="btnAddPly" style="flex:1">➕ 添加球员</button>
+    </div>
+  </div>
+</div>
+
+<!-- 单名球员资料编辑 -->
+<div class="mask" id="maskPlayer">
+  <div class="sheet" style="position:relative;">
+    <span class="closex" data-close>×</span>
+    <h2 id="plyTitle">球员资料</h2>
+    <div class="sub" id="plySub">填写后会在场上显示该球员信息</div>
+    <div class="field"><label>姓名</label><input id="fName" placeholder="如：梅西"></div>
+    <div class="row" style="margin-bottom:12px;gap:8px;">
+      <div class="field" style="flex:1"><label>号码</label><input id="fNum" type="number" min="1" max="99" placeholder="10"></div>
+      <div class="field" style="flex:1"><label>位置</label>
+        <select id="fPos">
+          <option value="门将">门将 GK</option><option value="后卫">后卫 CB</option>
+          <option value="左后卫">左后卫 LB</option><option value="右后卫">右后卫 RB</option>
+          <option value="边后卫">边后卫 FB</option><option value="左翼卫">左翼卫 LWB</option>
+          <option value="右翼卫">右翼卫 RWB</option><option value="翼卫">翼卫 WB</option>
+          <option value="后腰">后腰 CDM</option><option value="中场">中场 CM</option>
+          <option value="左中场">左中场 LM</option><option value="右中场">右中场 RM</option>
+          <option value="前腰">前腰 CAM</option><option value="攻击中场">攻击中场 AM</option>
+          <option value="左边锋">左边锋 LW</option><option value="右边锋">右边锋 RW</option>
+          <option value="边锋">边锋 W</option><option value="前锋">前锋 ST</option>
+          <option value="中锋">中锋 ST</option><option value="影子前锋">影子前锋 SS</option>
+        </select>
+      </div>
+    </div>
+    <div class="row" style="margin-bottom:12px;gap:8px;">
+      <div class="field" style="flex:1"><label>身高 cm</label><input id="fH" type="number" placeholder="170"></div>
+      <div class="field" style="flex:1"><label>体重 kg</label><input id="fW" type="number" placeholder="68"></div>
+    </div>
+    <div class="field" style="margin-bottom:12px;"><label>惯用脚</label>
+      <select id="fFoot">
+        <option value="右脚">右脚</option><option value="左脚">左脚</option><option value="双脚">双脚</option>
+      </select>
+    </div>
+    <div class="field" style="margin-bottom:12px;"><label>状态 / 备注（体能、伤病、特点等）</label>
+      <input id="fNote" placeholder="如：体能充沛 / 黄牌在身"></div>
+    <div class="footbtn">
+      <button class="btn ghost" data-close style="flex:1">取消</button>
+      <button class="btn red" id="btnRemove" style="flex:1">移出阵容</button>
+      <button class="btn" id="btnSavePly" style="flex:1.4">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 天气弹层 -->
+<div class="mask" id="maskWeather">
+  <div class="sheet" style="position:relative;">
+    <span class="closex" data-close>×</span>
+    <h2>⛅ 比赛天气</h2>
+    <div class="sub">天气会影响 AI 给出的战术建议</div>
+    <div class="formgrid" id="weatherGrid"></div>
+    <div class="field" style="margin-top:12px;"><label>气温 (°C)</label><input id="fTemp" type="number" value="22"></div>
+    <div class="footbtn"><button class="btn ghost" data-close style="flex:1">取消</button>
+      <button class="btn" id="btnSaveWeather" style="flex:1">保存</button></div>
+  </div>
+</div>
+
+<!-- 教练弹层 -->
+<div class="mask" id="maskCoach">
+  <div class="sheet" style="position:relative;">
+    <span class="closex" data-close>×</span>
+    <h2>🎯 教练设置</h2>
+    <div class="sub">设定主教练与战术风格</div>
+    <div class="field"><label>主教练</label><input id="fCoach" placeholder="如：瓜迪奥拉"></div>
+    <div class="field"><label>战术风格</label>
+      <select id="fStyle">
+        <option>控球压制</option><option>快速反击</option><option>高位逼抢</option>
+        <option>防守反击</option><option>两翼齐飞</option><option>长传冲吊</option>
+      </select>
+    </div>
+    <div class="field"><label>当前比分（主 : 客）</label>
+      <div class="row"><input id="fScoreUs" type="number" value="0" style="width:70px"><span>:</span><input id="fScoreThem" type="number" value="0" style="width:70px"></div>
+    </div>
+    <div class="footbtn"><button class="btn ghost" data-close style="flex:1">取消</button>
+      <button class="btn" id="btnSaveCoach" style="flex:1">保存</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ 数据存储 ============ */
+const LS='tactics_board_v2';
+const STATE=load();
+function load(){try{const d=JSON.parse(localStorage.getItem(LS));if(d&&d.players&&d.players.length>=23)return d;}catch(e){}
+  // 23 人标准名单：11 首发 + 12 替补
+  const names=['门将','左后卫','中卫A','中卫B','右后卫','左中场','后腰','中场','右中场','前锋A','前锋B'];
+  const posInit=['门将','后卫','后卫','后卫','后卫','边锋','后腰','中场','边锋','前锋','前锋'];
+  const players=[];
+  for(let i=0;i<11;i++){
+    players.push({id:i+1,name:names[i],num:[1,3,4,5,2,7,6,8,11,9,10][i],
+      pos:posInit[i],h:0,w:0,foot:'右脚',note:'',starter:true,x:0,y:0});
+  }
+  const subs=[
+    ['替补1',12,'中场'],['替补2',13,'前锋'],['替补3',14,'后卫'],['替补4',15,'门将'],
+    ['替补5',16,'中场'],['替补6',17,'边锋'],['替补7',18,'后卫'],['替补8',19,'中场'],
+    ['替补9',20,'前锋'],['替补10',21,'边锋'],['替补11',22,'后卫'],['替补12',23,'后腰']
+  ];
+  subs.forEach((s,i)=>players.push({id:12+i,name:s[0],num:s[1],pos:s[2],h:0,w:0,foot:'右脚',note:'',starter:false}));
+  return {
+    weather:{type:'晴天',temp:22},
+    coach:{name:'',style:'控球压制'},
+    score:{us:0,them:0},
+    formation:'4-4-2',
+    selfPlan:'',
+    players
+  };
+}
+function save(){localStorage.setItem(LS,JSON.stringify(STATE));}
+
+/* ============ 阵型模板（10 名外场 + 门将固定） ============ */
+const FORMATIONS={
+  '4-4-2':[{x:16,y:72},{x:34,y:80},{x:66,y:80},{x:84,y:72},{x:20,y:48},{x:40,y:56},{x:60,y:56},{x:80,y:48},{x:40,y:24},{x:62,y:24}],
+  '4-3-3':[{x:16,y:72},{x:34,y:80},{x:66,y:80},{x:84,y:72},{x:30,y:54},{x:50,y:60},{x:70,y:54},{x:18,y:30},{x:50,y:20},{x:82,y:30}],
+  '3-5-2':[{x:22,y:74},{x:50,y:82},{x:78,y:74},{x:12,y:54},{x:34,y:50},{x:50,y:58},{x:66,y:50},{x:88,y:54},{x:36,y:24},{x:64,y:24}],
+  '4-2-3-1':[{x:16,y:72},{x:34,y:80},{x:66,y:80},{x:84,y:72},{x:36,y:62},{x:64,y:62},{x:24,y:40},{x:50,y:34},{x:76,y:40},{x:50,y:18}],
+  '5-3-2':[{x:10,y:70},{x:28,y:80},{x:50,y:84},{x:72,y:80},{x:90,y:70},{x:32,y:54},{x:50,y:60},{x:68,y:54},{x:34,y:26},{x:66,y:26}],
+  '4-1-4-1':[{x:16,y:72},{x:34,y:80},{x:66,y:80},{x:84,y:72},{x:50,y:66},{x:24,y:48},{x:40,y:52},{x:60,y:52},{x:76,y:48},{x:50,y:20}],
+};
+const FORMDESC={'4-4-2':'攻守均衡，适合大多数球队','4-3-3':'强调边路进攻与压迫','3-5-2':'中场人数占优，两翼齐飞','4-2-3-1':'现代主流，控制中场','5-3-2':'防守稳固，打反击','4-1-4-1':'中场保护强，适合控制节奏'};
+
+/* 位置中文 → 足球通用简写 */
+const POS={};
+POS['门将']='GK';POS['后卫']='CB';POS['边后卫']='FB';POS['左后卫']='LB';POS['右后卫']='RB';POS['翼卫']='WB';
+POS['左翼卫']='LWB';POS['右翼卫']='RWB';POS['后腰']='CDM';POS['中场']='CM';
+POS['左中场']='LM';POS['右中场']='RM';POS['前腰']='CAM';POS['攻击中场']='AM';POS['边锋']='W';
+POS['左边锋']='LW';POS['右边锋']='RW';POS['前锋']='ST';POS['中锋']='ST';POS['影子前锋']='SS';
+const posShort=p=>POS[p.pos]||p.pos;
+
+/* ============ 渲染 ============ */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+let editingId=null;
+
+function playerHTML(p){
+  const nm=escapeAttr(p.name);
+  return `<input class="pname" type="text" value="${nm}" placeholder="姓名" data-id="${p.id}">` +
+         `<span class="pos">${posShort(p)}</span>` +
+         `<span class="num">${p.num||''}</span>`;
+}
+function render(){
+  const pitch=$('#pitch');
+  $$('.player',pitch).forEach(p=>p.remove());
+  STATE.players.filter(p=>p.starter).forEach(p=>{
+    const el=document.createElement('div');
+    el.className='player';el.dataset.id=p.id;
+    el.style.left=(p.x||50)+'%';el.style.top=(p.y||50)+'%';
+    el.innerHTML=playerHTML(p);
+    pitch.appendChild(el);
+  });
+  const bench=$('#benchGrid');bench.innerHTML='';
+  const subs=STATE.players.filter(p=>!p.starter);
+  subs.forEach(p=>{
+    const el=document.createElement('div');
+    el.className='player bench sub';el.dataset.id=p.id;
+    el.innerHTML=playerHTML(p);
+    el.onclick=()=>subToStarter(p.id);
+    bench.appendChild(el);
+  });
+  // 补齐 12 个替补空位
+  for(let i=subs.length;i<12;i++){
+    const s=document.createElement('div');s.className='benchslot';s.textContent='＋';s.onclick=()=>addPlayer(true);
+    bench.appendChild(s);
+  }
+  $('#benchCount').textContent=subs.length;
+  $('#valWeather').textContent=`${STATE.weather.type} ${STATE.weather.temp}°C`;
+  const c=STATE.coach.name||'未设置';
+  $('#valCoach').textContent=`${c} · ${STATE.formation}`;
+  $('#valScore').textContent=`${STATE.score.us} : ${STATE.score.them}`;
+}
+
+function posNote(p){return [p.pos,p.h?p.h+'cm':'',p.w?p.w+'kg':'',p.foot].filter(Boolean).join(' · ');}
+
+/* 阵型按钮 */
+function renderFormations(){
+  const g=$('#formGrid');g.innerHTML='';
+  Object.keys(FORMATIONS).forEach(f=>{
+    const d=document.createElement('div');
+    d.className='formopt'+(STATE.formation===f?' active':'');
+    d.innerHTML=`<div class="ff">${f}</div><div class="fd">${FORMDESC[f]}</div>`;
+    d.onclick=()=>applyFormation(f);
+    g.appendChild(d);
+  });
+}
+function applyFormation(f){
+  STATE.formation=f;
+  const starters=STATE.players.filter(p=>p.starter).sort((a,b)=>order(a)-order(b));
+  const gk=starters.find(p=>p.pos==='门将');
+  const out=starters.filter(p=>p.pos!=='门将');
+  const slots=FORMATIONS[f];
+  if(gk)gk.x=50,gk.y=92;
+  out.forEach((p,i)=>{if(slots[i]){p.x=slots[i].x;p.y=slots[i].y;}});
+  save();render();renderFormations();
+  toast('已切换为 '+f);
+}
+// 门将优先排第一
+function order(p){return p.pos==='门将'?-1:p.id;}
+
+/* ============ 拖动 ============ */
+function setupDrag(){
+  let drag=null;
+  const pitch=$('#pitch');
+  const TH=6;                       // 移动超过 6px 才算拖动，否则视为点击
+  function start(e,el){
+    if(e.target.classList&&(e.target.classList.contains('pname')||e.target.classList.contains('pos')))return;
+    const r=pitch.getBoundingClientRect();
+    const cx=(e.touches?e.touches[0].clientX:e.clientX), cy=(e.touches?e.touches[0].clientY:e.clientY);
+    drag={el,id:+el.dataset.id,r,sx:cx,sy:cy,dx:cx,dy:cy,moved:false};
+    el.classList.add('dragging');
+  }
+  function move(e){
+    if(!drag)return;
+    const cx=(e.touches?e.touches[0].clientX:e.clientX), cy=(e.touches?e.touches[0].clientY:e.clientY);
+    drag.dx=cx;drag.dy=cy;
+    if(!drag.moved && (Math.abs(cx-drag.sx)>TH || Math.abs(cy-drag.sy)>TH))drag.moved=true;
+    if(drag.moved){
+      e.preventDefault();
+      let x=((cx-drag.r.left)/drag.r.width*100), y=((cy-drag.r.top)/drag.r.height*100);
+      x=Math.max(4,Math.min(96,x));y=Math.max(3,Math.min(97,y));
+      drag.el.style.left=x+'%';drag.el.style.top=y+'%';
+    }
+  }
+  function end(){
+    if(!drag)return;
+    const was=drag.moved;
+    const el=drag.el;
+    const id=drag.id;
+    drag=null;
+    el.classList.remove('dragging');
+    if(was){
+      const p=STATE.players.find(pl=>pl.id===id);
+      if(p){p.x=+el.style.left.replace('%','');p.y=+el.style.top.replace('%','');save();}
+    }
+  }
+  document.addEventListener('mousedown',e=>{const el=e.target.closest('.player');if(el&&el.classList.contains('player')&&el.parentNode.id==='pitch')start(e,el);});
+  document.addEventListener('touchstart',e=>{const el=e.target.closest('.player');if(el&&el.classList.contains('player')&&el.parentNode.id==='pitch')start(e,el);},{passive:false});
+  document.addEventListener('mousemove',move);document.addEventListener('touchmove',move,{passive:false});
+  document.addEventListener('mouseup',end);document.addEventListener('touchend',end);
+}
+
+/* 替补上场 */
+function subToStarter(id){
+  const p=STATE.players.find(pl=>pl.id===id);if(!p)return;
+  const starters=STATE.players.filter(pl=>pl.starter);
+  if(starters.length>=11){
+    const out=starters.find(s=>s.pos===p.pos)||starters[0];
+    out.starter=false;
+  }
+  p.starter=true;
+  const slot=(FORMATIONS[STATE.formation]||FORMATIONS['4-4-2'])[0]||{x:50,y:50};
+  p.x=slot.x;p.y=slot.y;
+  save();render();toast(p.name+' 已上场');
+}
+
+/* ============ 球员编辑 ============ */
+function openPlayer(id){
+  const p=STATE.players.find(pl=>pl.id===id);if(!p)return;
+  editingId=id;
+  $('#plyTitle').textContent=(p.starter?'首发：':'替补：')+p.name;
+  $('#fName').value=p.name;$('#fNum').value=p.num;$('#fPos').value=p.pos;
+  $('#fH').value=p.h;$('#fW').value=p.w;$('#fFoot').value=p.foot;$('#fNote').value=p.note;
+  $('#btnRemove').textContent=p.starter?'移至替补席':'移除球员';
+  showMask('maskPlayer');
+}
+function savePlayer(){
+  const p=STATE.players.find(pl=>pl.id===editingId);if(!p)return;
+  p.name=$('#fName').value.trim()||'未命名';
+  p.num=$('#fNum').value||'';p.pos=$('#fPos').value;
+  p.h=+$('#fH').value||0;p.w=+$('#fW').value||0;
+  p.foot=$('#fFoot').value;p.note=$('#fNote').value.trim();
+  save();render();renderRoster();closeMasks();toast('已保存');
+}
+function removePlayer(){
+  const p=STATE.players.find(pl=>pl.id===editingId);if(!p)return;
+  if(p.starter){p.starter=false;toast('已移至替补席');}
+  else{STATE.players=STATE.players.filter(pl=>pl.id!==p.id);toast('已移除球员');}
+  save();render();renderRoster();closeMasks();
+}
+
+/* ============ AI 建议 ============ */
+function aiAnalyze(userText){
+  const lines=[];
+  const w=STATE.weather.type, t=STATE.weather.temp;
+  const st=STATE.coach.style, f=STATE.formation;
+  const starters=STATE.players.filter(p=>p.starter);
+  const subs=STATE.players.filter(p=>!p.starter);
+  const diff=STATE.score.us-STATE.score.them;
+  const named=s=>s.filter(p=>p.name&&p.name!=='未命名'&&!/^[门将左中右前替补]/.test(p.name));
+  const sn=named(starters);
+  const byPos={};starters.forEach(p=>byPos[p.pos]=(byPos[p.pos]||0)+1);
+  const SH=p=>POS[p.pos]||p.pos;
+
+  /* ============ 没有自我部署：通用多板块建议 ============ */
+  if(!userText||!userText.trim()){
+    lines.push({t:'📊 当前态势',items:[
+      `阵型 <b>${f}</b>，战术风格「${st}」，天气 <b>${w} ${t}°C</b>；`,
+      `比分 <b>${STATE.score.us} : ${STATE.score.them}</b>（${diff>0?'领先':diff<0?'落后':'平局'}${diff?Math.abs(diff)+' 球':''}）；`,
+      sn.length>0?`已命名 ${sn.length} 人：${sn.map(p=>p.name).join('、')}。`:'场上球员尚未命名，建议先在球衣下方输入姓名。'
+    ]});
+
+    const wth=[];
+    if(w.includes('雨'))wth.push('场地湿滑，<b>减少后场短传</b>，出球果断，避免停球失误；球速变快，远射威胁上升。');
+    if(w.includes('雪'))wth.push('雪天能见度低、地面不平，<b>多用长传与边路</b>，减少地面连续传递。');
+    if(w.includes('风'))wth.push('逆风一方<b>少打高球</b>、以短传控节奏；顺风一方可加大斜长传与远射。');
+    if(w.includes('高温')||t>=30)wth.push(`气温 ${t}°C，上半场<b>控制节奏节省体能</b>，55–65 分钟优先换上体能型球员。`);
+    if(w==='潮湿')wth.push('湿度高、消耗大，增加补水暂停利用，中场多轮换。');
+    if(['晴天','多云','阴天'].includes(w))wth.push(`${w}，场地条件理想，可完整执行既定打法。`);
+    if(t<5)wth.push('低温下肌肉易拉伤，热身与中场保暖要到位。');
+    if(!wth.length)wth.push(`${w}，按正常节奏部署即可。`);
+    lines.push({t:'🌤️ 天气与场地',items:wth});
+
+    const fw=(byPos['前锋']||0)+(byPos['中锋']||0)+(byPos['影子前锋']||0);
+    const cdm=byPos['后腰']||0;
+    const cm=(byPos['中场']||0)+(byPos['前腰']||0)+(byPos['攻击中场']||0);
+    const df=(byPos['后卫']||0)+(byPos['左后卫']||0)+(byPos['右后卫']||0)+(byPos['边后卫']||0);
+    const wk=(byPos['边锋']||0)+(byPos['左边锋']||0)+(byPos['右边锋']||0);
+    lines.push({t:'🧩 阵型结构分析',items:[
+      `前场 ${fw} 人、中场 ${cm+cdm} 人（含后腰 ${cdm}）、后场 ${df} 人、边锋 ${wk} 人；`,
+      fw>=2?'双前锋配置，禁区内有两个接应点，传中落点更丰富。':'单前锋孤立，需靠前腰或边锋内收支援。',
+      cdm>=1?'有专职后腰，中场有第一道屏障，边后卫可以大胆压上。':'缺少专职后腰，中场容易被打穿，建议后腰回撤保护。',
+      wk>=2?'两翼齐飞，拉开宽度，适合传中与快速反击。':'边路人数不足，进攻宽度要靠边后卫前插提供。'
+    ]});
+
+    if(diff>0){
+      lines.push({t:`🏆 领先 ${diff} 球怎么守`,items:[
+        '阵型整体<b>回收 10–15 米</b>，压缩禁区前沿空间，不给对手远射与直塞机会；',
+        '边锋回撤协助防守，形成 4-4-2 防守阵型，封锁边路传中；',
+        '控球节奏放慢，多横传回传消耗时间，避免高位逼抢导致身后空当；',
+        '保留一名速度型前锋在前场，利用对手压上打反击。'
+      ]});
+    }else if(diff<0){
+      const need=Math.abs(diff);
+      lines.push({t:`🔥 落后 ${need} 球怎么追`,items:[
+        need>=2?'分差较大，<b>必须提前变阵</b>，考虑 4-2-3-1 或 3-5-2 增加中前场人数，第 50 分钟前就动手。':'调整空间充足，可在 60 分钟后集中发力。',
+        '边后卫大幅压上，形成宽度，<b>增加传中与二点球争抢</b>；',
+        '加强高位逼抢，迫使对手后场出球失误，在前场 30 米制造机会；',
+        '尽早用完换人名额，换上攻击型球员与速度点，不要等到最后 10 分钟。'
+      ]});
+    }else{
+      lines.push({t:'⚖️ 平局怎么打开局面',items:[
+        '保持耐心，<b>控制控球率</b>，把节奏掌握在自己脚下，避免急躁远射；',
+        '左右两边交替起球，拉扯对手防线横向移动，寻找空当；',
+        '60 分钟左右是体能下降窗口，此时换人往往见效最快；',
+        '避免无意义犯规，定位球是打破僵局的重要手段。'
+      ]});
+    }
+
+    const ins=[];
+    starters.forEach(p=>{
+      if(p.h>=192)ins.push(`${p.name||'球员'} ${p.h}cm，制空与定位球争顶是明显优势。`);
+      if(p.w&&p.h){const b=Math.round(p.w/((p.h/100)**2));if(b>=27)ins.push(`${p.name||'球员'} BMI ${b}，对抗强但体能消耗快，注意下半场换人。`);}
+      if(p.foot==='左脚')ins.push(`${p.name||'球员'} 左脚，主战右路内侧或左路下底。`);
+      if(p.foot==='右脚')ins.push(`${p.name||'球员'} 右脚，主战左路内侧或右路下底。`);
+    });
+    if(sn.length>=11)ins.push(`主力 11 人已齐整：${sn.map(p=>p.name).join('、')}。`);
+    if(ins.length)lines.push({t:'📈 球员数据洞察',items:ins.slice(0,5)});
+
+    const sb=subs.filter(p=>p.name&&p.name!=='未命名'&&!/^[门将左中右前替补]/.test(p.name));
+    const tall=sb.filter(p=>p.h>=188);const fast=sb.filter(p=>['边锋','左边锋','右边锋','前锋','中锋'].includes(p.pos));
+    lines.push({t:'🔄 换人与替补调度',items:[
+      '60–70 分钟是体能拐点，<b>调节奏型换人</b>优先：后腰与边后卫最该轮换；',
+      '追分阶段第 55 分钟就换上攻击手，领先阶段则先换防守型中场稳节奏；',
+      tall.length?`定位球攻坚可用 ${tall.map(p=>p.name).join('、')} 争顶。`:'替补席缺少高中锋，定位球争顶需靠主力完成。',
+      fast.length?`需要速度反击时，可用 ${fast.map(p=>p.name).join('、')} 冲击身后。`:'替补缺少速度型边锋。'
+    ]});
+
+    const risk=[];
+    if(starters.length<11)risk.push(`首发仅 ${starters.length} 人，请先补满 11 人再开赛。`);
+    if(!byPos['后腰']&&!/防守反击|快速反击/.test(st))risk.push('缺少专职后腰，对手打反击时中路容易直接面对中卫，让一名中场回撤保护。');
+    if((byPos['边锋']||0)>=2&&!/两翼|传中/.test(st))risk.push(`选了 ${byPos['边锋']} 名边锋，但风格是「${st}」，边路资源没有被充分激活。`);
+    if(risk.length)lines.push({t:'⚠️ 风险提示',items:risk});
+    return lines;
+  }
+
+  /* ============ 有自我部署：逐条针对分析 ============ */
+  const txt=userText.toLowerCase();
+  const has=s=>txt.includes(s);
+  lines.push({t:'✍️ 你的部署原文',items:[`<div style="white-space:pre-wrap;line-height:1.75;">${escapeHtml(userText)}</div>`]});
+
+  const R=[
+    {t:'🪽 边路打法',c:()=>has('边路')||has('两翼')||has('传中')||has('下底')||has('翼'),
+     g:'边路是高效的突破口，建议安排<b>双脚均衡的边锋 + 助攻型边后卫套上</b>，形成叠瓦式配合。',
+     w:'传中失败后边后卫身后容易被打反击，必须有人保护二点球。',
+     a:'左右两边交替起球，拉扯对手防线横向移动，中路包抄点不少于两人。'},
+    {t:'⚡ 反击思路',c:()=>has('反击')||has('快速')||has('身后')||has('速度')||has('冲刺'),
+     g:'打反击是对阵强队的高效选择，少消耗且转换杀伤大，关键在中场第一传质量。',
+     w:'反击对出球速度要求极高，被断球瞬间容易被对手直接面对后卫。',
+     a:'留一名速度型前锋在前场，丢球后 5 秒全队反抢，中场第一传必须果断。'},
+    {t:'🎯 控球打法',c:()=>has('控球')||has('传导')||has('短传')||has('压制')||has('控场'),
+     g:'控球压制能主导比赛节奏，减少对手触球机会，需要中场有稳定的出球点。',
+     w:'一味短传容易在禁区前沿被断，形成反击漏洞。',
+     a:'后腰频繁回撤接应，边后卫内收形成人数优势，控球要结合突然的纵向直塞。'},
+    {t:'🔥 高位逼抢',c:()=>has('逼抢')||has('压迫')||has('高位')||has('前场抢'),
+     g:'高位逼抢能迫使对手后场失误，在前场直接制造机会，节奏一旦成型杀伤极大。',
+     w:'逼抢一旦被破解，身后大片空当直接暴露，体能消耗也极大。',
+     a:'逼抢需全队同步，中场必须前压形成包围，单点逼抢毫无意义。'},
+    {t:'⚙️ 中场控制',c:()=>has('中场')||has('控制节奏')||has('组织'),
+     g:'掌控中场就掌控比赛，能决定攻守转换的主动权，需要出球核心+扫荡后腰的组合。',
+     w:'中场人数若不足，容易被对手通过中路直塞打穿。',
+     a:'保留至少一名后腰作为屏障，其余中场轮流前插支援进攻。'},
+    {t:'🥋 定位球',c:()=>has('定位球')||has('角球')||has('任意球')||has('头球'),
+     g:'定位球是破密集防守的利器，角球与任意球的得分效率很高。',
+     w:'进攻定位球落点被预判时，容易丢掉二点球被反击。',
+     a:'安排身高 190cm 左右的球员抢前点，同时设置掩护与后点包抄。'},
+    {t:'🔁 换人调整',c:()=>has('换')||has('上场')||has('调整人员')||has('替补'),
+     g:'主动换人能改变场上节奏与阵型，是教练最直接的干预手段。',
+     w:'换人过早可能打乱默契，过晚又错过体能窗口。',
+     a:'55–70 分钟这个体能拐点集中调整，三个名额按"调节奏—改战术—应急"的顺序用。'},
+    {t:'🦾 体能与轮换',c:()=>has('体能')||has('休息')||has('轮换')||has('体力'),
+     g:'重视体能管理能避免下半场崩盘，尤其高温天气。',
+     w:'轮换过多会破坏场上默契与进攻连续性。',
+     a:'提前确定核心位置不轮换，其余按体能数据安排。'},
+    {t:'🎯 远射',c:()=>has('远射')||has('禁区外'),
+     g:'禁区外远射能打破僵局，也迫使对手防线不敢压得太靠上。',
+     w:'盲目远射会浪费进攻机会，还会丢失球权。',
+     a:'只在禁区弧顶、无人盯防时果断起脚，其余时间以传导为主。'},
+    {t:'🔥 追分策略',c:()=>diff<0||has('追分')||has('扳平')||has('追'),
+     g:'落后时主动求变是必要的，可以提高前场人数与逼抢强度。',
+     w:'一味压上会彻底暴露身后空当，被对手打反击可能扩大分差。',
+     a:'适度压上同时保留一名前锋在前场牵制，打反击与定位球双线追分。'},
+    {t:'🛡️ 防守巩固',c:()=>diff>0||has('守住')||has('防守')||has('回收')||has('密集'),
+     g:'领先时收缩防线是稳健选择，能把比赛节奏掌握在自己手里。',
+     w:'过度回收会把主动权完全交给对手，增加风险。',
+     a:'两条线距离压到 20 米内，但留一名速度型前锋在对方半场牵制。'}
+  ];
+  let comments=R.filter(o=>o.c());
+  if(!comments.length)comments=[{t:'💬 总体评估',g:'你的部署思路已记录，整体方向可以执行。',
+    w:'部署偏概括，缺少具体的阵型、人员与时段安排。',
+    a:'建议补充打哪条边路、何时换人、针对对方哪个位置等细节，分析会更精准。'}];
+  comments.forEach(c=>lines.push({t:c.t,items:[`<b>合理之处：</b>${c.g}`,`<b>需要警惕：</b>${c.w}`,`<b>具体建议：</b>${c.a}`]}));
+
+  if(diff>0)lines.push({t:'⏱️ 当前比分提醒',items:[`你目前 <b>领先 ${diff} 球</b>（${STATE.score.us}:${STATE.score.them}），建议以稳健防守为主，避免无谓冒险。`,'换人优先考虑防守型球员，控制比赛节奏。']});
+  else if(diff<0)lines.push({t:'⏱️ 当前比分提醒',items:[`你目前 <b>落后 ${Math.abs(diff)} 球</b>（${STATE.score.us}:${STATE.score.them}），需要主动提升进攻强度。`,'尽早用完换人名额，不要等到最后时刻才追。']});
+  else lines.push({t:'⏱️ 当前比分提醒',items:[`目前平局 ${STATE.score.us}:${STATE.score.them}，节奏掌控是关键。`,'60 分钟左右是体能窗口，适时换人往往决定胜负。']});
+
+  return lines;
+}
+
+function escapeHtml(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function escapeAttr(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;');}
+
+function showAdvice(list){
+  const box=$('#adviceBox'),el=$('#adviceList');box.classList.add('show');
+  el.innerHTML=list.map(l=>{
+    const items=(l.items||[]).map(s=>`<li>${s}</li>`).join('');
+    return `<div class="line"><div class="lt">${l.t}</div><ul>${items}</ul></div>`;
+  }).join('');
+}
+
+/* 自我部署：渲染你的部署原文 */
+function renderSelfPlan(){
+  const box=$('#adviceBox'),el=$('#adviceList');
+  box.classList.add('show');
+  const saved=(STATE.selfPlan||'').trim();
+  el.innerHTML=`<div class="line"><div class="lt">✍️ 我的自我部署</div>${
+    saved?`<div style="white-space:pre-wrap;line-height:1.7;">${escapeHtml(saved)}</div>`
+         :`<div style="color:var(--sub);">还没有记录。先在下方输入框写下你的部署想法，再点「让 AI 分析我的部署」。</div>`
+  }</div>`;
+}
+
+/* ============ 名单 ============ */
+function renderRoster(){
+  const el=$('#rosterList');el.innerHTML='';
+  if(!STATE.players.length){el.innerHTML='<div class="empty">名单为空，点击添加球员</div>';return;}
+  const groups=[['首发（点击上场）',STATE.players.filter(p=>p.starter)],['替补',STATE.players.filter(p=>!p.starter)]];
+  groups.forEach(([title,list])=>{
+    if(!list.length)return;
+    const head=document.createElement('div');
+    head.style.cssText='font-size:12px;color:var(--sub);margin:6px 0 2px;font-weight:700;';
+    head.textContent=title;el.appendChild(head);
+    list.forEach(p=>{
+      const d=document.createElement('div');
+      d.className='pitem';
+      const bmi=(p.h&&p.w)?Math.round(p.w/((p.h/100)**2)):'';
+      const tdata=[p.h?p.h+'cm':'',p.w?p.w+'kg':'',bmi?'BMI'+bmi:''].filter(Boolean).join(' / ');
+      d.innerHTML=`<div class="av">${p.num||'?'}<span>${posShort(p)}</span></div>
+        <div class="info"><div class="n">${p.name||'未命名'}</div>
+        <div class="d">${posShort(p)} · ${tdata}${tdata?' · ':''}${p.foot}${p.note?' · '+p.note:''}</div></div>
+        <div class="acts">
+          <button class="btn ghost sm" data-act="toggle">${p.starter?'替补':'首发'}</button>
+          <button class="btn blue sm" data-act="edit">编辑</button>
+        </div>`;
+      d.querySelector('[data-act=edit]').onclick=()=>{closeMasks();openPlayer(p.id);};
+      d.querySelector('[data-act=toggle]').onclick=()=>{
+        if(p.starter){p.starter=false;}
+        else if(STATE.players.filter(x=>x.starter).length<11){p.starter=true;}
+        else{toast('首发已满 11 人，先替换一名球员');return;}
+        save();render();renderRoster();
+      };
+      el.appendChild(d);
+    });
+  });
+}
+function addPlayer(asSub){
+  const id=Date.now();
+  STATE.players.push({id,name:'新球员'+(STATE.players.length+1),num:'',pos:'中场',h:0,w:0,foot:'右脚',note:'',
+    starter:!asSub&&STATE.players.filter(p=>p.starter).length<11});
+  save();render();renderRoster();
+  openPlayer(id);
+}
+
+/* ============ 通用交互 ============ */
+function showMask(id){$(`#${id}`).classList.add('show');}
+function closeMasks(){$$('.mask').forEach(m=>m.classList.remove('show'));}
+let toastTimer;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),1800);}
+
+/* 点击场上球员：快速改位置（资料编辑统一走「球员资料」按钮） */
+document.addEventListener('click',e=>{
+  const pe=e.target.closest('.player');
+  if(pe&&pe.parentNode.id==='pitch'){
+    const p=STATE.players.find(pl=>pl.id===+pe.dataset.id);if(!p)return;
+    const posList=['门将','后卫','后腰','中场','前腰','边锋','前锋'];
+    const idx=posList.indexOf(p.pos);
+    p.pos=posList[(idx+1)%posList.length];
+    save();render();toast('位置 → '+p.pos);return;
+  }
+  const ce=e.target.closest('[data-close]');if(ce)closeMasks();
+});
+
+$('#btnWeather').onclick=()=>{renderWeather();$('#fTemp').value=STATE.weather.temp;showMask('maskWeather');};
+$('#btnSaveWeather').onclick=()=>{STATE.weather.temp=+$('#fTemp').value||22;save();render();closeMasks();toast('天气已更新');};
+$('#btnCoach').onclick=()=>{$('#fCoach').value=STATE.coach.name;$('#fStyle').value=STATE.coach.style;
+  $('#fScoreUs').value=STATE.score.us;$('#fScoreThem').value=STATE.score.them;showMask('maskCoach');};
+$('#btnSaveCoach').onclick=()=>{STATE.coach.name=$('#fCoach').value.trim();STATE.coach.style=$('#fStyle').value;
+  STATE.score.us=+$('#fScoreUs').value||0;STATE.score.them=+$('#fScoreThem').value||0;save();render();closeMasks();toast('教练设置已保存');};
+$('#btnRoster').onclick=()=>{renderRoster();showMask('maskRoster');};
+$('#btnAddPly').onclick=()=>addPlayer(false);
+$('#btnSavePly').onclick=savePlayer;
+$('#btnRemove').onclick=removePlayer;
+
+// 场上姓名输入：阻止拖动、失焦保存、回车收键盘
+document.addEventListener('focusin',e=>{
+  const inp=e.target.closest('.pname');
+  if(inp){inp.dataset.editing='1';}
+});
+document.addEventListener('blur',e=>{
+  const inp=e.target.closest('.pname');
+  if(inp&&inp.dataset.editing){inp.dataset.editing='';saveName(inp);}
+},true);
+document.addEventListener('input',e=>{
+  const inp=e.target.closest('.pname');
+  if(!inp)return;
+  const p=STATE.players.find(pl=>pl.id===+inp.dataset.id);
+  if(p){p.name=inp.value.trim()||'未命名';}
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target.classList&&e.target.classList.contains('pname')){e.target.blur();}
+});
+function saveName(inp){
+  const p=STATE.players.find(pl=>pl.id===+inp.dataset.id);
+  if(!p)return;
+  const v=inp.value.trim();
+  p.name=v||'未命名';
+  inp.value=p.name;
+  save();render();renderRoster();
+}
+$('#btnAI').onclick=()=>{$('#adviceTitle').textContent='🤖 AI 战术建议';const list=aiAnalyze('');showAdvice(list);$('#adviceBox').scrollIntoView({behavior:'smooth'});};
+$('#btnSelf').onclick=()=>{
+  $('#adviceTitle').textContent='✍️ 我的自我部署';
+  renderSelfPlan();
+  $('#selfInput').value=STATE.selfPlan||'';
+  $('#selfInput').focus();
+  $('#adviceBox').scrollIntoView({behavior:'smooth'});
+};
+$('#btnAskAI').onclick=()=>{
+  const txt=$('#selfInput').value;
+  if(!txt.trim()){toast('请先输入你的部署');return;}
+  STATE.selfPlan=txt.trim();save();
+  const list=aiAnalyze(txt);
+  showAdvice(list);
+};
+$('#btnBackAI').onclick=()=>{const list=aiAnalyze('');showAdvice(list);};
+
+/* 天气 */
+const WEATHERS=['晴天','多云','阴天','小雨','大雨','雷阵雨','小雪','高温','大风','潮湿'];
+function renderWeather(){
+  const g=$('#weatherGrid');g.innerHTML='';
+  WEATHERS.forEach(w=>{
+    const d=document.createElement('div');
+    d.className='formopt'+(STATE.weather.type===w?' active':'');
+    d.innerHTML=`<div class="ff">${w}</div>`;
+    d.onclick=()=>{STATE.weather.type=w;renderWeather();};
+    g.appendChild(d);
+  });
+}
+
+/* 首次进入用当前阵型排好初始位置 */
+applyFormation(STATE.formation);
+renderFormations();render();setupDrag();
+</script>
+</body>
+</html>
